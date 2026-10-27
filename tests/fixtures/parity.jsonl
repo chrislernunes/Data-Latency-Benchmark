@@ -1,0 +1,7 @@
+{"type":"header","version":1,"symbol":"BTCUSDT","market":"spot","depth_stream":"btcusdt@depth","include_trades":true,"snapshot_limit":5000,"clock":"perf_counter_ns"}
+{"type":"snapshot","last_update_id":100,"bids":[["100.00","1.50"],["99.5","2"],["9","3.0"]],"asks":[["101.0","1"],["20","4"],["100","5.00"]],"local_recv_ns":1,"reason":"initial"}
+{"type":"depth","U":100,"u":104,"b":[["99.50","0.00000000"],["100","2.0"]],"a":[["20.0","0"]],"E":1,"local_recv_ns":2}
+{"type":"agg_trade","a":7,"p":"100.1","q":"0.01","E":3,"T":3,"m":false,"local_recv_ns":3}
+{"type":"depth","U":90,"u":99,"b":[["1","9"]],"a":[],"E":4,"local_recv_ns":4}
+{"type":"depth","U":105,"u":106,"b":[["9.0","0"]],"a":[["100.000","1.0"]],"E":5,"local_recv_ns":5}
+{"type":"footer","version":1,"status":"complete","records":5,"resyncs":0,"content_sha256":"2e83824f92495ea1835490ca3743a5fb24f1e1960fed57e891b0996849f7f4ca"}

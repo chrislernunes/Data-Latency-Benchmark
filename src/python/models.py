@@ -1,81 +1,105 @@
-"""Normalized event types and capture format helpers."""
+"""Capture records and JSONL parsing.
+
+Schema version 1. Unknown fields are ignored. Required fields are
+checked. Prices and quantities in the file are exchange strings; engines
+canonicalize them when applying.
+"""
 
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, asdict
-from decimal import Decimal
-from typing import Any, List, Optional, Tuple
 
-PriceQty = Tuple[str, str]  # decimal strings
+SCHEMA_VERSION = 1
+INT64_MAX = 2**63 - 1
 
 
-@dataclass
-class Header:
-    type: str = "header"
-    version: int = 1
-    symbol: str = ""
-    market: str = "spot"
-    start_ts_ns: int = 0
+class CaptureFormatError(ValueError):
+    pass
 
 
-@dataclass
-class SnapshotEvent:
-    type: str = "snapshot"
-    last_update_id: int = 0
-    bids: List[PriceQty] = None
-    asks: List[PriceQty] = None
-    local_recv_ns: int = 0
-    exchange_ts: Optional[int] = None
-
-    def __post_init__(self):
-        if self.bids is None:
-            self.bids = []
-        if self.asks is None:
-            self.asks = []
+class UnsupportedSchemaError(CaptureFormatError):
+    """The file declares a schema this tool cannot read."""
 
 
-@dataclass
-class DepthEvent:
-    type: str = "depth"
-    U: int = 0  # first update id
-    u: int = 0  # final update id
-    b: List[PriceQty] = None
-    a: List[PriceQty] = None
-    E: Optional[int] = None  # exchange event time
-    local_recv_ns: int = 0
-
-    def __post_init__(self):
-        if self.b is None:
-            self.b = []
-        if self.a is None:
-            self.a = []
+def dumps(record: dict) -> str:
+    return json.dumps(record, separators=(",", ":"), ensure_ascii=False)
 
 
-@dataclass
-class AggTradeEvent:
-    type: str = "agg_trade"
-    a: int = 0  # aggregate trade id
-    p: str = ""  # price
-    q: str = ""  # quantity
-    T: Optional[int] = None
-    m: bool = False  # is buyer maker
-    local_recv_ns: int = 0
+def parse_line(line: str) -> dict:
+    try:
+        data = json.loads(line)
+    except json.JSONDecodeError as exc:
+        raise CaptureFormatError(f"invalid JSON: {exc}") from exc
+    if not isinstance(data, dict):
+        raise CaptureFormatError("JSONL record must be an object")
+    kind = data.get("type")
+    if kind == "header":
+        _require_version(data)
+        _require_str(data, "symbol")
+        _require_str(data, "market")
+        return data
+    if kind == "footer":
+        _require_version(data)
+        _require_str(data, "status")
+        return data
+    if kind == "snapshot":
+        _require_i64(data, "last_update_id")
+        _require_levels(data, "bids")
+        _require_levels(data, "asks")
+        return data
+    if kind == "depth":
+        _require_i64(data, "U")
+        _require_i64(data, "u")
+        _require_levels(data, "b")
+        _require_levels(data, "a")
+        return data
+    if kind == "agg_trade":
+        _require_i64(data, "a")
+        _require_str(data, "p")
+        _require_str(data, "q")
+        return data
+    raise CaptureFormatError(f"unknown record type: {kind!r}")
 
 
-def event_to_json(obj: Any) -> str:
-    return json.dumps(asdict(obj), separators=(",", ":"))
+def levels_of(record: dict, key: str) -> list[tuple[str, str]]:
+    return [(level[0], level[1]) for level in record[key]]
 
 
-def parse_event(line: str) -> Any:
-    data = json.loads(line)
-    t = data.get("type")
-    if t == "header":
-        return Header(**data)
-    if t == "snapshot":
-        return SnapshotEvent(**data)
-    if t == "depth":
-        return DepthEvent(**data)
-    if t == "agg_trade":
-        return AggTradeEvent(**data)
-    raise ValueError(f"Unknown event type: {t}")
+def _require_version(data: dict) -> None:
+    version = data.get("version")
+    if isinstance(version, bool) or not isinstance(version, int):
+        raise CaptureFormatError("version must be an integer")
+    if version != SCHEMA_VERSION:
+        raise UnsupportedSchemaError(f"unsupported schema version: {version}")
+
+
+def _require_str(data: dict, key: str) -> None:
+    value = data.get(key)
+    if not isinstance(value, str) or value == "":
+        raise CaptureFormatError(f"{key} must be a non-empty string")
+
+
+def _require_i64(data: dict, key: str) -> None:
+    value = data.get(key)
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise CaptureFormatError(f"{key} must be an integer")
+    if value < 0 or value > INT64_MAX:
+        raise CaptureFormatError(f"{key} is outside uint63 range")
+
+
+def _require_levels(data: dict, key: str) -> None:
+    value = data.get(key)
+    if not isinstance(value, list):
+        raise CaptureFormatError(f"{key} must be a list")
+    for level in value:
+        if (
+            not isinstance(level, list)
+            or len(level) < 2
+            or not isinstance(level[0], str)
+            or not isinstance(level[1], str)
+        ):
+            raise CaptureFormatError(f"{key} levels must be [price, quantity] strings")
+
+
+def as_jsonable(value: Any) -> Any:
+    return value

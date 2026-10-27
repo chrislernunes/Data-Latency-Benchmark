@@ -1,0 +1,4 @@
+{"type":"header","version":1,"symbol":"BTCUSDT","market":"spot","depth_stream":"btcusdt@depth","include_trades":true,"snapshot_limit":5000,"clock":"perf_counter_ns"}
+{"type":"snapshot","last_update_id":10,"bids":[["5","1"]],"asks":[["6","1"]],"local_recv_ns":1,"reason":"initial"}
+{"type":"depth","U":12,"u":12,"b":[],"a":[],"E":2,"local_recv_ns":2}
+{"type":"footer","version":1,"status":"complete","records":2,"resyncs":0,"content_sha256":"b36895a1c619a0b2faa5d09f5c1b3ccea40837fce72f6c20c815bea2aa11dd13"}
